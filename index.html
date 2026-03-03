@@ -55,24 +55,21 @@
         @keyframes shake { 0%{transform:translate(2px,1px)} 50%{transform:translate(-2px,-1px)} 100%{transform:translate(1px,-1px)} }
 
         /* =======================================================
-           📱 スマホ専用モード（JSで body に mobile-mode が付与されます）
+           📱 スマホ専用モード
            ======================================================= */
-        /* --- 共通レイアウト --- */
         .mobile-mode #app { display: flex; flex-direction: column; align-items: center; background: #111; }
         .mobile-mode #top-bar { width: 100vw; box-sizing: border-box; flex-wrap: wrap; gap: 10px; padding: 5px; justify-content: space-around; font-size: 14px; }
         .mobile-mode .money-text { font-size: 18px; }
         .mobile-mode .nekokan-text { font-size: 16px; padding: 2px 5px; }
 
-        /* --- 縦画面 (Portrait) の巨大ボタンモード --- */
         .mobile-mode .ui-main { display: flex; flex-wrap: wrap; justify-content: space-between; align-content: flex-start; width: 100vw; box-sizing: border-box; padding: 10px; overflow-y: auto; gap: 10px; margin-top: 5px; }
         .mobile-mode .worker-btn { order: 1; width: calc(50% - 5px); height: 90px; font-size: 20px; }
         .mobile-mode .cannon-btn { order: 2; width: calc(50% - 5px); height: 90px; font-size: 20px; align-self: flex-start;}
         .mobile-mode .deck-grid { order: 3; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; min-width: unset; margin-top: 5px; }
-        .mobile-mode .slot { width: 100%; height: 120px; } /* スロットが巨大化 */
+        .mobile-mode .slot { width: 100%; height: 120px; }
         .mobile-mode .slot .icon { height: 75px; }
         .mobile-mode .slot .cost { font-size: 20px; padding: 5px 0; }
         
-        /* --- 横画面 (Landscape) のスワイプ・オーバーレイモード --- */
         @media (orientation: landscape) and (max-height: 600px) {
             .mobile-mode #app { position: relative; }
             .mobile-mode #game-container { margin-top: 0; }
@@ -81,13 +78,12 @@
                 flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
                 background: rgba(0, 0, 0, 0.75); padding: 10px 15px; box-sizing: border-box;
                 align-items: center; gap: 15px; justify-content: flex-start; margin: 0;
-                /* スクロールバー非表示でスタイリッシュに */
                 scrollbar-width: none;
             }
             .mobile-mode .ui-main::-webkit-scrollbar { display: none; }
             .mobile-mode .worker-btn, .mobile-mode .cannon-btn { order: unset; flex: 0 0 110px; height: 90px; }
             .mobile-mode .deck-grid { order: unset; display: flex; flex-direction: row; gap: 15px; width: auto; margin: 0; }
-            .mobile-mode .slot { flex: 0 0 100px; height: 90px; } /* 横に並ぶため正方形に近い巨大ボタンに */
+            .mobile-mode .slot { flex: 0 0 100px; height: 90px; }
         }
     </style>
 </head>
@@ -123,11 +119,9 @@
 </div>
 
 <script>
-    // --- PCとスマホの切り替えロジック (超重要) ---
     function resizeApp() {
         const app = document.getElementById('app');
         const gc = document.getElementById('game-container');
-        // スマホ判定 (画面幅900px以下、または高さ600px以下)
         const isMobile = window.innerWidth <= 900 || window.innerHeight <= 600;
 
         if (isMobile) {
@@ -136,24 +130,22 @@
             app.style.width = '100vw';
             app.style.height = '100vh';
             
-            // ゲーム画面だけを幅に合わせて縮小し、余白を詰める
             const isLandscape = window.innerWidth > window.innerHeight;
-            let gcScale = window.innerWidth / 990;
-            if (!isLandscape) {
-                // 縦画面の場合は、ゲーム画面が縦に長くなりすぎないよう制限
-                gcScale = Math.min(gcScale, (window.innerHeight * 0.4) / 380);
-            } else {
-                // 横画面の場合は高さを少し制限
-                gcScale = Math.min(gcScale, window.innerHeight / 380);
-            }
+            
+            // 修正：画面からはみ出さないよう、幅と高さの両方から最適なスケールを算出
+            let scaleW = window.innerWidth / 990;
+            // 縦画面なら画面の40%、横画面なら70%程度に収める
+            let heightLimit = isLandscape ? 0.7 : 0.4;
+            let scaleH = (window.innerHeight * heightLimit) / 380;
+            
+            let gcScale = Math.min(scaleW, scaleH);
             
             gc.style.transform = `scale(${gcScale})`;
             gc.style.transformOrigin = 'top center';
             
-            // 縮小した分の隙間を消して、下のUIを上に引き上げるテクニック
+            // 下のUIを引き上げるマージンを計算
             gc.style.marginBottom = `-${380 * (1 - gcScale)}px`; 
         } else {
-            // これまでのPC用レイアウト
             document.body.classList.remove('mobile-mode');
             app.style.width = '1000px';
             app.style.height = '720px';
@@ -167,7 +159,6 @@
     window.addEventListener('resize', resizeApp);
     resizeApp();
 
-    // --- データ読み込みロジック ---
     let nekokan = parseInt(localStorage.getItem('nekokan')) || 1000;
     let ownedCats = { 'normal': 1 };
     try {
@@ -182,7 +173,6 @@
     } catch(e) {}
     document.getElementById('nekokan-val').innerText = nekokan;
 
-    // --- キャラ＆敵データ ---
     const CATS = [
         { id: 'normal', name: 'ねこ', cost: 50, hp: 110, atk: 18, speed: 2.2, range: 45, cd: 2000, area: false, img: 'normal.png', scale: 0.8 },
         { id: 'wall', name: 'かべ', cost: 150, hp: 1000, atk: 5, speed: 1.4, range: 30, cd: 4000, area: false, img: 'wall.png', scale: 1.35 },
