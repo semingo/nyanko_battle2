@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>にゃんこ大戦争風 - サンドイッチ配置Ver</title>
+    <title>にゃんこ大戦争風 - コンパクトVer</title>
     <style>
         :root { --p-color: #2980b9; --e-color: #c0392b; }
         body { 
             margin: 0; padding: 0; background: #111; font-family: 'Hiragino Sans', sans-serif; 
             overflow: hidden; display: flex; justify-content: center; align-items: center; 
-            width: 100vw; height: 100vh; color: white; touch-action: none; overscroll-behavior: none;
+            width: 100vw; height: 100vh; color: white; 
+            /* ズームとスクロールを完全に禁止 */
+            touch-action: none; 
+            overscroll-behavior: none;
             padding-bottom: env(safe-area-inset-bottom);
         }
         
         #app { width: 1000px; height: 720px; transform-origin: center center; display: flex; flex-direction: column; position: relative; }
 
-        #top-bar { background: #111; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 40px; border-bottom: 2px solid #444; z-index: 50; flex-shrink: 0; }
+        #top-bar { background: #111; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 40px; border-bottom: 2px solid #444; z-index: 50; flex-shrink: 0; height: 50px; box-sizing: border-box; }
         .money-text { font-size: 28px; color: #f1c40f; font-weight: bold; }
         .nekokan-text { font-size: 20px; color: #f1c40f; border: 1px solid #f1c40f; padding: 2px 10px; border-radius: 5px; }
 
-        #game-container { position: relative; width: 990px; height: 320px; margin: 0 auto; background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%); border: 5px solid #000; border-bottom: none; overflow: hidden; flex-shrink: 0; box-sizing: content-box; }
+        #game-container { position: relative; width: 990px; height: 350px; margin: 0 auto; background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%); border: 5px solid #000; border-bottom: none; overflow: hidden; flex-shrink: 0; box-sizing: content-box; }
         #ground { position: absolute; bottom: 0; width: 100%; height: 40px; background: #8B4513; border-top: 4px solid #5D2E0C; z-index: 2; }
 
         .base { position: absolute; bottom: 35px; width: 150px; height: 200px; display: flex; flex-direction: column; align-items: center; background-size: contain; background-repeat: no-repeat; background-position: center bottom; z-index: 3; }
@@ -35,81 +38,51 @@
         .hp-mini { position: absolute; top: -15px; width: 100%; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #fff; }
         .hp-mini-inner { height: 100%; background: #0f0; width: 100%; }
 
-        /* UIメイン: 働きネコ - キャラリスト - にゃんこ砲 の順に横並び */
         .ui-main { 
-            background: #5D2E0C; 
-            border: 5px solid #000; 
-            width: 990px;
-            margin: 0 auto;
-            display: flex; 
-            flex-direction: row; 
-            padding: 15px; 
-            z-index: 50; 
-            flex-grow: 1; 
-            box-sizing: border-box;
-            gap: 10px;
-            align-items: stretch; /* 子要素の高さを揃える */
+            background: #5D2E0C; border: 5px solid #000; width: 990px; margin: 0 auto;
+            display: flex; flex-direction: row; padding: 10px; z-index: 50; flex-grow: 1; 
+            box-sizing: border-box; gap: 10px; align-items: center; overflow: hidden;
         }
 
-        /* 左右の固定ボタンエリア */
-        .side-control {
-            display: flex;
-            flex-direction: column;
-            width: 140px;
-            flex-shrink: 0;
-            justify-content: center;
-        }
+        .side-control { display: flex; flex-direction: column; width: 140px; flex-shrink: 0; height: 192px; }
 
-        .deck-scroll-container {
-            flex-grow: 1; 
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            display: flex;
-            align-items: center;
+        .deck-scroll-container { 
+            flex-grow: 1; overflow-x: auto; -webkit-overflow-scrolling: touch; height: 200px;
+            display: flex; align-items: center; touch-action: pan-x; /* 横スクロールのみ許可 */
         }
-        .deck-scroll-container::-webkit-scrollbar { height: 8px; }
-        .deck-scroll-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .deck-scroll-container::-webkit-scrollbar { height: 6px; }
+        .deck-scroll-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
 
+        /* グリッドの高さを 125px*2 → 90px*2 に短縮 */
         .deck-grid { 
-            display: grid; 
-            grid-template-rows: repeat(2, 125px); 
-            grid-auto-flow: column; 
-            grid-auto-columns: 110px; 
-            gap: 12px; 
-            padding: 0 5px;
-            min-width: max-content;
+            display: grid; grid-template-rows: repeat(2, 90px); 
+            grid-auto-flow: column; grid-auto-columns: 100px; gap: 12px; 
+            padding: 0 5px; min-width: max-content;
         }
         
+        /* ボタン単体のサイズを短縮 */
         .slot { 
-            position: relative; background: #333; border: 4px solid #777; border-radius: 8px; 
-            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            position: relative; background: #333; border: 3px solid #777; border-radius: 8px; 
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; 
             color: white; transition: 0.1s; overflow: hidden; padding: 0; 
-            width:110px; height:125px; user-select: none; flex-shrink: 0;
+            width:100px; height:90px; user-select: none; flex-shrink: 0;
+            touch-action: manipulation;
         }
         .slot:active { transform: scale(0.95); }
-        .slot:disabled { opacity: 0.5; cursor: not-allowed; border-color: #444; filter: grayscale(1); }
-        .slot .icon { width: 100%; height: 75px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-top: 5px; pointer-events: none; }
-        .slot .cost { font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.8); width: 100%; padding: 4px 0; position: absolute; bottom: 0; pointer-events: none; }
-        .slot .lvl-badge { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,0.8); color: #f1c40f; padding: 2px 4px; font-size: 13px; border-radius: 3px; font-weight: bold; z-index: 10; pointer-events: none; }
+        .slot:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+        /* アイコンの高さを調整 */
+        .slot .icon { width: 100%; height: 55px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-top: 2px; pointer-events: none; }
+        .slot .cost { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); width: 100%; padding: 2px 0; position: absolute; bottom: 0; pointer-events: none; }
+        .slot .lvl-badge { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.8); color: #f1c40f; padding: 1px 3px; font-size: 11px; border-radius: 2px; font-weight: bold; z-index: 10; pointer-events: none; }
         
         .cd-mask { position: absolute; bottom: 0; width: 100%; height: 0%; background: rgba(0,0,0,0.7); pointer-events: none; }
 
-        /* 両端のボタンの見た目を調整（2段分の高さに合わせる） */
+        /* サイドボタンの高さをグリッドに合わせる */
         .worker-btn, .cannon-btn { 
-            width: 100%; 
-            height: 100%; /* 親要素(ui-main)の高さに追従 */
-            min-height: 262px; /* 125px*2 + 12px(gap) */
-            border-radius: 12px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 10px; 
-            border: 4px solid; 
-            user-select: none; 
-            font-size: 18px; 
+            width: 100%; height: 100%; border-radius: 10px; cursor: pointer; font-weight: bold; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            gap: 5px; border: 4px solid; user-select: none; font-size: 16px;
+            touch-action: manipulation;
         }
         .worker-btn { background: #d35400; border-color: #e67e22; }
         .cannon-btn { background: #2980b9; border-color: #3498db; position: relative; overflow: hidden; }
@@ -158,13 +131,25 @@
             <div class="cannon-btn" onclick="fireCannon()">
                 <div id="cannon-fill" class="cannon-fill"></div>
                 <span style="position:relative; z-index:2;">にゃんこ砲</span>
-                <span style="position:relative; z-index:2; font-size: 14px;">発射！</span>
+                <span style="position:relative; z-index:2; font-size: 13px;">発射！</span>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // iOS/Safariなどのダブルタップズームを強制無効化
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+    
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
+    }, false);
+
     function resizeApp() {
         const app = document.getElementById('app');
         const scale = Math.min(window.innerWidth / 1000, window.innerHeight / 720, 1);
