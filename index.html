@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>にゃんこ大戦争風 - 調整Ver</title>
+    <title>にゃんこ大戦争風 - コンパクトVer</title>
     <style>
         :root { --p-color: #2980b9; --e-color: #c0392b; }
         body { 
             margin: 0; padding: 0; background: #111; font-family: 'Hiragino Sans', sans-serif; 
             overflow: hidden; display: flex; justify-content: center; align-items: center; 
             width: 100vw; height: 100vh; color: white; 
+            /* ズームとスクロールを完全に禁止 */
             touch-action: none; 
             overscroll-behavior: none;
             padding-bottom: env(safe-area-inset-bottom);
@@ -37,20 +38,19 @@
         .hp-mini { position: absolute; top: -15px; width: 100%; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #fff; }
         .hp-mini-inner { height: 100%; background: #0f0; width: 100%; }
 
-        /* UIエリアを少し上に浮かせ、角を丸く調整 */
         .ui-main { 
             background: #5D2E0C; border: 5px solid #000; width: 990px; 
-            margin: 15px auto 0; /* 上に余白を作って位置を上げる */
+            margin: 15px auto 0; /* 位置を少し上に調整 */
             display: flex; flex-direction: row; padding: 10px; z-index: 50; flex-grow: 1; 
             box-sizing: border-box; gap: 10px; align-items: center; overflow: hidden;
-            border-radius: 12px; /* 少し角を丸くして浮かんでいる感を出す */
+            border-radius: 12px; /* カドを少し丸く */
         }
 
         .side-control { display: flex; flex-direction: column; width: 140px; flex-shrink: 0; height: 192px; }
 
         .deck-scroll-container { 
             flex-grow: 1; overflow-x: auto; -webkit-overflow-scrolling: touch; height: 200px;
-            display: flex; align-items: center; touch-action: pan-x;
+            display: flex; align-items: center; touch-action: pan-x; /* 横スクロールのみ許可 */
         }
         .deck-scroll-container::-webkit-scrollbar { height: 6px; }
         .deck-scroll-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
@@ -66,7 +66,7 @@
             cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; 
             color: white; transition: 0.1s; overflow: hidden; padding: 0; 
             width:100px; height:90px; user-select: none; flex-shrink: 0;
-            touch-action: manipulation;
+            touch-action: none; /* ダブルタップズームを完全に防止 */
         }
         .slot:active { transform: scale(0.95); }
         .slot:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
@@ -80,7 +80,7 @@
             width: 100%; height: 100%; border-radius: 10px; cursor: pointer; font-weight: bold; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
             gap: 5px; border: 4px solid; user-select: none; font-size: 16px;
-            touch-action: manipulation;
+            touch-action: none; /* ダブルタップズームを完全に防止 */
         }
         .worker-btn { background: #d35400; border-color: #e67e22; }
         .cannon-btn { background: #2980b9; border-color: #3498db; position: relative; overflow: hidden; }
@@ -136,6 +136,7 @@
 </div>
 
 <script>
+    // iOS/Safariなどのダブルタップズームを強制無効化
     document.addEventListener('touchstart', (e) => {
         if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
@@ -229,7 +230,7 @@
         let maxM = 1000 + (workerLv * 1000);
         money = Math.min(maxM, money + (0.2 + workerLv * 0.3));
         
-        // 所持金とお財布上限の表示を更新
+        // 所持金表示と上限表示を更新
         document.getElementById('money').innerText = Math.floor(money);
         document.getElementById('max-m').innerText = maxM; 
         
