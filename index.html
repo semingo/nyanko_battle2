@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>にゃんこ大戦争風 - モバイル対応Ver</title>
+    <style>
+        :root { --p-color: #2980b9; --e-color: #c0392b; }
+        /* スワイプによる画面全体のズレ（バウンス）を防止 */
+        body { margin: 0; padding: 0; background: #111; font-family: 'Hiragino Sans', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; color: white; touch-action: none; overscroll-behavior: none; }
+        
+        #app { width: 1000px; height: 720px; transform-origin: center center; display: flex; flex-direction: column; position: relative; }
+
+        #top-bar { background: #111; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 40px; border-bottom: 2px solid #444; z-index: 50; }
+        .money-text { font-size: 28px; color: #f1c40f; font-weight: bold; }
+        .nekokan-text { font-size: 20px; color: #f1c40f; border: 1px solid #f1c40f; padding: 2px 10px; border-radius: 5px; }
+
+        /* ゲーム画面枠（内部座標は常に990x380） */
+        #game-container { position: relative; width: 990px; height: 380px; margin: 15px auto; background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%); border: 5px solid #000; overflow: hidden; flex-shrink: 0; box-sizing: content-box; }
+        #ground { position: absolute; bottom: 0; width: 100%; height: 50px; background: #8B4513; border-top: 4px solid #5D2E0C; z-index: 2; }
+
+        .base { position: absolute; bottom: 40px; width: 150px; height: 200px; display: flex; flex-direction: column; align-items: center; background-size: contain; background-repeat: no-repeat; background-position: center bottom; z-index: 3; }
+        #enemy-base { left: 0; background-image: url('e_castle.png'); }
+        #player-base { right: 0; background-image: url('p_castle.png'); }
+        
+        .base-hp { width: 100px; height: 12px; background: #000; border: 2px solid #fff; margin-top: -30px; position: relative; }
+        .base-hp-inner { height: 100%; background: #0f0; width: 100%; transition: width 0.3s; }
+
+        #start-overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; top: 0; left: 0; }
+        
+        .unit { position: absolute; bottom: 45px; width: 80px; height: 80px; z-index: 5; transition: transform 0.1s; background-size: contain; background-repeat: no-repeat; background-position: center bottom; pointer-events: none; }
+        .hp-mini { position: absolute; top: -15px; width: 100%; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #fff; }
+        .hp-mini-inner { height: 100%; background: #0f0; width: 100%; }
+
+        /* ----- PC版 UI（基本） ----- */
+        .ui-main { display: flex; justify-content: center; gap: 15px; margin-top: auto; margin-bottom: 10px; z-index: 50; }
+        .deck-grid { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(2, 100px); gap: 10px; min-width: 540px; }
+        .slot { position: relative; background: #444; border: 4px solid #777; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: 0.1s; overflow: hidden; padding: 0; width:100px; height:100px; user-select: none; }
+        .slot:active { transform: scale(0.95); }
+        .slot:disabled { opacity: 0.5; cursor: not-allowed; border-color: #333; }
+        .slot .icon { width: 100%; height: 60px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-top: 5px; pointer-events: none; }
+        .slot .cost { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.6); width: 100%; padding: 4px 0; position: absolute; bottom: 0; pointer-events: none; }
+        .slot .lvl-badge { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.8); color: #f1c40f; padding: 2px 4px; font-size: 12px; border-radius: 3px; font-weight: bold; z-index: 10; pointer-events: none; }
+        
+        .cd-mask { position: absolute; bottom: 0; width: 100%; height: 0%; background: rgba(0,0,0,0.7); pointer-events: none; }
+
+        .worker-btn, .cannon-btn { width: 130px; height: 100px; border-radius: 10px; cursor: pointer; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 4px solid; user-select: none; }
+        .worker-btn { background: #d35400; border-color: #e67e22; }
+        .cannon-btn { background: #2980b9; border-color: #3498db; position: relative; overflow: hidden; }
+        .cannon-fill { position: absolute; bottom: 0; width: 100%; background: rgba(255,255,255,0.4); height: 0%; pointer-events: none; }
+
+        .damage-pop { position: absolute; color: white; font-weight: bold; text-shadow: 2px 2px #000; animation: floatUp 0.7s forwards; pointer-events: none; z-index: 20; font-size: 20px; }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-60px); opacity: 0; } }
+        .shake { animation: shake 0.2s infinite; }
+        @keyframes shake { 0%{transform:translate(2px,1px)} 50%{transform:translate(-2px,-1px)} 100%{transform:translate(1px,-1px)} }
+
+        /* =======================================================
+           📱 スマホ専用モード（JSで body に mobile-mode が付与されます）
+           ======================================================= */
+        /* --- 共通レイアウト --- */
+        .mobile-mode #app { display: flex; flex-direction: column; align-items: center; background: #111; }
+        .mobile-mode #top-bar { width: 100vw; box-sizing: border-box; flex-wrap: wrap; gap: 10px; padding: 5px; justify-content: space-around; font-size: 14px; }
+        .mobile-mode .money-text { font-size: 18px; }
+        .mobile-mode .nekokan-text { font-size: 16px; padding: 2px 5px; }
+
+        /* --- 縦画面 (Portrait) の巨大ボタンモード --- */
+        .mobile-mode .ui-main { display: flex; flex-wrap: wrap; justify-content: space-between; align-content: flex-start; width: 100vw; box-sizing: border-box; padding: 10px; overflow-y: auto; gap: 10px; margin-top: 5px; }
+        .mobile-mode .worker-btn { order: 1; width: calc(50% - 5px); height: 90px; font-size: 20px; }
+        .mobile-mode .cannon-btn { order: 2; width: calc(50% - 5px); height: 90px; font-size: 20px; align-self: flex-start;}
+        .mobile-mode .deck-grid { order: 3; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; min-width: unset; margin-top: 5px; }
+        .mobile-mode .slot { width: 100%; height: 120px; } /* スロットが巨大化 */
+        .mobile-mode .slot .icon { height: 75px; }
+        .mobile-mode .slot .cost { font-size: 20px; padding: 5px 0; }
+        
+        /* --- 横画面 (Landscape) のスワイプ・オーバーレイモード --- */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .mobile-mode #app { position: relative; }
+            .mobile-mode #game-container { margin-top: 0; }
+            .mobile-mode .ui-main {
+                position: absolute; bottom: 0; left: 0; width: 100vw; height: 110px;
+                flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+                background: rgba(0, 0, 0, 0.75); padding: 10px 15px; box-sizing: border-box;
+                align-items: center; gap: 15px; justify-content: flex-start; margin: 0;
+                /* スクロールバー非表示でスタイリッシュに */
+                scrollbar-width: none;
+            }
+            .mobile-mode .ui-main::-webkit-scrollbar { display: none; }
+            .mobile-mode .worker-btn, .mobile-mode .cannon-btn { order: unset; flex: 0 0 110px; height: 90px; }
+            .mobile-mode .deck-grid { order: unset; display: flex; flex-direction: row; gap: 15px; width: auto; margin: 0; }
+            .mobile-mode .slot { flex: 0 0 100px; height: 90px; } /* 横に並ぶため正方形に近い巨大ボタンに */
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="top-bar">
+        <div>働きネコ Lv.<span id="w-lv">1</span></div>
+        <div class="money-text">¥<span id="money">0</span> / <span id="max-m">2000</span></div>
+        <div class="nekokan-text">缶: <span id="nekokan-val">0</span></div>
+    </div>
+
+    <div id="game-container">
+        <div id="ground"></div>
+        <div id="enemy-base" class="base"><div class="base-hp"><div id="e-hp-bar" class="base-hp-inner"></div></div></div>
+        <div id="player-base" class="base"><div class="base-hp"><div id="p-hp-bar" class="base-hp-inner"></div></div></div>
+
+        <div id="start-overlay">
+            <h1 style="font-size: 35px; margin-bottom: 20px;">にゃんこ大戦争風</h1>
+            <button onclick="startGame()" style="padding:15px 40px; font-size:24px; cursor:pointer; background:#2ecc71; color:white; border:none; border-radius:10px; font-weight:bold;">戦闘開始</button>
+            <button onclick="location.href='gacha.html'" style="margin-top:20px; padding:12px 30px; background:#e67e22; color:white; border:none; border-radius:10px; font-size:18px; cursor:pointer; font-weight:bold;">ガチャ画面へ</button>
+        </div>
+    </div>
+
+    <div class="ui-main">
+        <div class="worker-btn" onclick="upgradeWorker()">働きネコUP<br><span id="w-cost">¥100</span></div>
+        <div class="deck-grid" id="deck-grid"></div>
+        <div class="cannon-btn" onclick="fireCannon()">
+            <div id="cannon-fill" class="cannon-fill"></div>
+            <div style="position:relative; z-index:2;">にゃんこ砲<br>READY</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- PCとスマホの切り替えロジック (超重要) ---
+    function resizeApp() {
+        const app = document.getElementById('app');
+        const gc = document.getElementById('game-container');
+        // スマホ判定 (画面幅900px以下、または高さ600px以下)
+        const isMobile = window.innerWidth <= 900 || window.innerHeight <= 600;
+
+        if (isMobile) {
+            document.body.classList.add('mobile-mode');
+            app.style.transform = 'none';
+            app.style.width = '100vw';
+            app.style.height = '100vh';
+            
+            // ゲーム画面だけを幅に合わせて縮小し、余白を詰める
+            const isLandscape = window.innerWidth > window.innerHeight;
+            let gcScale = window.innerWidth / 990;
+            if (!isLandscape) {
+                // 縦画面の場合は、ゲーム画面が縦に長くなりすぎないよう制限
+                gcScale = Math.min(gcScale, (window.innerHeight * 0.4) / 380);
+            } else {
+                // 横画面の場合は高さを少し制限
+                gcScale = Math.min(gcScale, window.innerHeight / 380);
+            }
+            
+            gc.style.transform = `scale(${gcScale})`;
+            gc.style.transformOrigin = 'top center';
+            
+            // 縮小した分の隙間を消して、下のUIを上に引き上げるテクニック
+            gc.style.marginBottom = `-${380 * (1 - gcScale)}px`; 
+        } else {
+            // これまでのPC用レイアウト
+            document.body.classList.remove('mobile-mode');
+            app.style.width = '1000px';
+            app.style.height = '720px';
+            const scale = Math.min(window.innerWidth / 1000, window.innerHeight / 720, 1);
+            app.style.transform = `scale(${scale})`;
+            app.style.transformOrigin = 'center center';
+            gc.style.transform = 'none';
+            gc.style.marginBottom = '15px';
+        }
+    }
+    window.addEventListener('resize', resizeApp);
+    resizeApp();
+
+    // --- データ読み込みロジック ---
+    let nekokan = parseInt(localStorage.getItem('nekokan')) || 1000;
+    let ownedCats = { 'normal': 1 };
+    try {
+        let savedData = localStorage.getItem('ownedCats');
+        if (savedData) {
+            let parsed = JSON.parse(savedData);
+            if (Array.isArray(parsed)) {
+                parsed.forEach(id => { ownedCats[id] = 1; });
+                localStorage.setItem('ownedCats', JSON.stringify(ownedCats));
+            } else { ownedCats = parsed; }
+        }
+    } catch(e) {}
+    document.getElementById('nekokan-val').innerText = nekokan;
+
+    // --- キャラ＆敵データ ---
+    const CATS = [
+        { id: 'normal', name: 'ねこ', cost: 50, hp: 110, atk: 18, speed: 2.2, range: 45, cd: 2000, area: false, img: 'normal.png', scale: 0.8 },
+        { id: 'wall', name: 'かべ', cost: 150, hp: 1000, atk: 5, speed: 1.4, range: 30, cd: 4000, area: false, img: 'wall.png', scale: 1.35 },
+        { id: 'battle', name: 'バトル', cost: 200, hp: 300, atk: 50, speed: 2.5, range: 50, cd: 5000, area: false, img: 'battle.png', scale: 1.35 },
+        { id: 'kimo', name: 'キモ', cost: 400, hp: 450, atk: 110, speed: 1.2, range: 250, cd: 8000, area: false, img: 'kimo.png', scale: 1.65 },
+        { id: 'giraffe', name: '牛', cost: 500, hp: 400, atk: 35, speed: 5.5, range: 40, cd: 6000, area: false, img: 'giraffe.png',scale: 1.5 },
+        { id: 'bird', name: 'とり', cost: 650, hp: 250, atk: 160, speed: 1.8, range: 180, cd: 12000, area: true, img: 'bird.png', scale: 1.35 },
+        { id: 'fish', name: 'さかな', cost: 800, hp: 800, atk: 220, speed: 2.0, range: 60, cd: 15000, area: false, img: 'fish.png', scale: 1.35 },
+        { id: 'tokage', name: 'トカゲ', cost: 1000,hp: 700, atk: 380, speed: 1.5, range: 100, cd: 18000, area: false, img: 'tokage.png', scale: 1.5 },
+        { id: 'gian', name: '巨人', cost: 1300,hp: 2000,atk: 450, speed: 1.0, range: 70, cd: 25000, area: true, img: 'gian.png', scale: 1.8 },
+        { id: 'hopping', name: 'ホッピング', cost: 350, hp: 600, atk: 120, speed: 3.5, range: 140, cd: 7000, area: false, img: 'hopping.png', scale: 1.35 },
+        { id: 'ruga1', name: 'ネコルガ', cost: 3000,hp: 4500, atk: 1000,speed: 0.8, range: 10, cd: 40000, area: true, img: 'ruga1.png', scale: 2.1 },
+        { id: 'shirasu', name: 'ラスボース', cost: 4500,hp: 9000, atk: 3500,speed: 1.2, range: 50, cd: 60000, area: true, img: 'shirasu.png', scale: 2.5 }
+    ];
+
+    const ENEMIES = {
+        dog:  { name: '犬', hp: 90,  atk: 12,  speed: 1.8, range: 40, reward: 30, img: 'dog.png', scale: 1.2 },
+        snk:  { name: '蛇', hp: 60,  atk: 6,   speed: 3.5, range: 35, reward: 20, img: 'snk.png', scale: 1.05 },
+        gori: { name: 'ゴリラ', hp: 4000,atk: 150, speed: 1.5, range: 60, reward: 600, img: 'gori.png',scale: 1.65, isBoss: true }
+    };
+
+    let money = 0, workerLv = 1, cannonCharge = 0, gameActive = false;
+    let playerHP = 2000, enemyHP = 2000;
+    const playerUnits = [], enemyUnits = [];
+    const cooldowns = {};
+
+    function initUI() {
+        const grid = document.getElementById('deck-grid');
+        grid.innerHTML = '';
+        CATS.forEach((cat) => {
+            if (!ownedCats[cat.id]) return;
+            const level = ownedCats[cat.id];
+            const btn = document.createElement('button');
+            btn.className = 'slot';
+            btn.id = `slot-${cat.id}`;
+            btn.onclick = () => spawnCat(cat.id);
+            btn.innerHTML = `<div class="lvl-badge">Lv.${level}</div><div class="icon" style="background-image: url('${cat.img}'); transform: scale(${cat.scale})"></div><div class="cost">¥${cat.cost}</div><div class="cd-mask" id="mask-${cat.id}"></div>`;
+            grid.appendChild(btn);
+            cooldowns[cat.id] = 0;
+        });
+    }
+
+    function startGame() {
+        document.getElementById('start-overlay').style.display = 'none';
+        gameActive = true;
+        updateLoop();
+        setInterval(enemySpawner, 3000);
+    }
+
+    function updateLoop() {
+        if (!gameActive) return;
+        let maxM = 1000 + (workerLv * 1000);
+        money = Math.min(maxM, money + (0.2 + workerLv * 0.3));
+        document.getElementById('money').innerText = Math.floor(money);
+        document.getElementById('max-m').innerText = maxM;
+        document.getElementById('w-lv').innerText = workerLv;
+        document.getElementById('w-cost').innerText = workerLv < 8 ? `¥${workerLv * 200}` : "MAX";
+
+        Object.keys(ownedCats).forEach(id => {
+            const cat = CATS.find(c => c.id === id);
+            const btn = document.getElementById(`slot-${id}`);
+            if (!btn) return;
+            const mask = document.getElementById(`mask-${id}`);
+            if (cooldowns[id] > 0) {
+                cooldowns[id] -= 16;
+                mask.style.height = (cooldowns[id] / cat.cd * 100) + "%";
+            }
+            btn.disabled = (money < cat.cost || cooldowns[id] > 0);
+        });
+
+        cannonCharge = Math.min(100, cannonCharge + 0.06);
+        document.getElementById('cannon-fill').style.height = cannonCharge + "%";
+
+        moveAndAttack(playerUnits, enemyUnits, 'player');
+        moveAndAttack(enemyUnits, playerUnits, 'enemy');
+
+        document.getElementById('p-hp-bar').style.width = (playerHP / 2000 * 100) + "%";
+        document.getElementById('e-hp-bar').style.width = (enemyHP / 2000 * 100) + "%";
+
+        if (enemyHP <= 0) endGame("完全勝利！\nネコ缶200個獲得！", 200);
+        if (playerHP <= 0) endGame("敗北...", 0);
+
+        requestAnimationFrame(updateLoop);
+    }
+
+    function spawnCat(id) {
+        const baseData = CATS.find(c => c.id === id);
+        const level = ownedCats[id] || 1;
+        const bonus = 1 + (level - 1) * 0.1;
+        const leveledData = { ...baseData, hp: Math.floor(baseData.hp * bonus), atk: Math.floor(baseData.atk * bonus) };
+        if (money < leveledData.cost || cooldowns[id] > 0) return;
+        money -= leveledData.cost; cooldowns[id] = leveledData.cd; createUnit(leveledData, 'player');
+    }
+
+    function moveAndAttack(units, targets, side) {
+        units.forEach(u => {
+            if (u.kb > 0) { u.kb--; u.x += (side==='player'?4:-4); u.el.style.left = u.x+'px'; return; }
+            let target = null;
+            if (side==='player' && u.x <= 100 + u.data.range) target = 'base';
+            else if (side==='enemy' && u.x >= 890 - u.data.range) target = 'base';
+            if (!target) { target = targets.find(t => side==='player' ? (u.x - t.x <= u.data.range && u.x > t.x) : (t.x - u.x <= u.data.range && t.x > u.x)); }
+            if (target) {
+                u.atkFrame = (u.atkFrame || 0) + 1;
+                if (u.atkFrame >= 50) {
+                    if (u.data.area) {
+                        targets.forEach(t => { if(Math.abs(u.x - t.x) <= u.data.range + 60) applyDamage(t, u.data.atk); });
+                        if (target==='base') hitBase(side, u.data.atk);
+                    } else {
+                        if (target==='base') hitBase(side, u.data.atk); else applyDamage(target, u.data.atk);
+                    }
+                    u.atkFrame = 0;
+                    u.el.style.transform = `scale(${u.data.scale * 1.3})`;
+                    setTimeout(()=>u.el.style.transform=`scale(${u.data.scale})`, 100);
+                }
+            } else {
+                u.x += u.data.speed * (side==='player'?-1:1);
+                u.el.style.left = u.x + 'px';
+            }
+        });
+        for(let i=units.length-1; i>=0; i--) {
+            if(units[i].hp <= 0) { if(side==='enemy') money += units[i].data.reward; units[i].el.remove(); units.splice(i,1); }
+        }
+    }
+
+    function applyDamage(unit, dmg) {
+        unit.hp -= dmg; popText(unit.x, unit.el.offsetTop, Math.floor(dmg));
+        if (dmg > unit.data.hp * 0.25) unit.kb = 10;
+        unit.el.querySelector('.hp-mini-inner').style.width = Math.max(0, (unit.hp/unit.data.hp*100))+"%";
+    }
+
+    function hitBase(side, dmg) { if(side==='player') enemyHP -= dmg; else playerHP -= dmg; screenShake(side==='player'?'enemy-base':'player-base'); }
+    function enemySpawner() { if (!gameActive) return; let type = Math.random() > 0.92 ? 'gori' : (Math.random() > 0.6 ? 'snk' : 'dog'); createUnit(ENEMIES[type], 'enemy'); }
+
+    function createUnit(data, side) {
+        const el = document.createElement('div'); el.className = 'unit';
+        el.style.backgroundImage = `url('${data.img}')`; el.style.transform = `scale(${data.scale})`;
+        el.innerHTML = `<div class="hp-mini"><div class="hp-mini-inner"></div></div>`;
+        const startX = side === 'player' ? 840 : 150;
+        const obj = { el, data, side, hp: data.hp, x: startX, kb: 0 };
+        el.style.left = startX + 'px';
+        if (data.id === 'bird') el.style.bottom = '145px';
+        if (data.id === 'shirasu') el.style.bottom = '100px';
+        document.getElementById('game-container').appendChild(el); (side==='player'?playerUnits:enemyUnits).push(obj);
+    }
+
+    function upgradeWorker() { let cost = workerLv * 200; if (money >= cost && workerLv < 8) { money -= cost; workerLv++; } }
+    function fireCannon() { if (cannonCharge < 100) return; cannonCharge = 0; screenShake(); enemyUnits.forEach(u => { applyDamage(u, 300); u.kb = 40; }); }
+    function popText(x, y, txt) { const t = document.createElement('div'); t.className = 'damage-pop'; t.innerText = txt; t.style.left = x + 'px'; t.style.top = y + 'px'; document.getElementById('game-container').appendChild(t); setTimeout(()=>t.remove(), 700); }
+    function screenShake(id = 'game-container') { const el = document.getElementById(id); el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'), 200); }
+    function endGame(m, bonus) { gameActive = false; if(bonus > 0) { nekokan += bonus; localStorage.setItem('nekokan', nekokan); } alert(m); location.reload(); }
+    initUI();
+</script>
+</body>
+</html>
