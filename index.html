@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>にゃんこ大戦争風 - モバイル対応Ver</title>
+    <title>にゃんこ大戦争風 - サンドイッチ配置Ver</title>
     <style>
         :root { --p-color: #2980b9; --e-color: #c0392b; }
-        /* スワイプによる画面全体のズレ（バウンス）を防止 */
-        body { margin: 0; padding: 0; background: #111; font-family: 'Hiragino Sans', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; color: white; touch-action: none; overscroll-behavior: none; }
+        body { 
+            margin: 0; padding: 0; background: #111; font-family: 'Hiragino Sans', sans-serif; 
+            overflow: hidden; display: flex; justify-content: center; align-items: center; 
+            width: 100vw; height: 100vh; color: white; touch-action: none; overscroll-behavior: none;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
         
         #app { width: 1000px; height: 720px; transform-origin: center center; display: flex; flex-direction: column; position: relative; }
 
-        #top-bar { background: #111; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 40px; border-bottom: 2px solid #444; z-index: 50; }
+        #top-bar { background: #111; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 40px; border-bottom: 2px solid #444; z-index: 50; flex-shrink: 0; }
         .money-text { font-size: 28px; color: #f1c40f; font-weight: bold; }
         .nekokan-text { font-size: 20px; color: #f1c40f; border: 1px solid #f1c40f; padding: 2px 10px; border-radius: 5px; }
 
-        /* ゲーム画面枠（内部座標は常に990x380） */
-        #game-container { position: relative; width: 990px; height: 380px; margin: 15px auto; background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%); border: 5px solid #000; overflow: hidden; flex-shrink: 0; box-sizing: content-box; }
-        #ground { position: absolute; bottom: 0; width: 100%; height: 50px; background: #8B4513; border-top: 4px solid #5D2E0C; z-index: 2; }
+        #game-container { position: relative; width: 990px; height: 320px; margin: 0 auto; background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%); border: 5px solid #000; border-bottom: none; overflow: hidden; flex-shrink: 0; box-sizing: content-box; }
+        #ground { position: absolute; bottom: 0; width: 100%; height: 40px; background: #8B4513; border-top: 4px solid #5D2E0C; z-index: 2; }
 
-        .base { position: absolute; bottom: 40px; width: 150px; height: 200px; display: flex; flex-direction: column; align-items: center; background-size: contain; background-repeat: no-repeat; background-position: center bottom; z-index: 3; }
+        .base { position: absolute; bottom: 35px; width: 150px; height: 200px; display: flex; flex-direction: column; align-items: center; background-size: contain; background-repeat: no-repeat; background-position: center bottom; z-index: 3; }
         #enemy-base { left: 0; background-image: url('e_castle.png'); }
         #player-base { right: 0; background-image: url('p_castle.png'); }
         
@@ -28,63 +31,94 @@
 
         #start-overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; top: 0; left: 0; }
         
-        .unit { position: absolute; bottom: 45px; width: 80px; height: 80px; z-index: 5; transition: transform 0.1s; background-size: contain; background-repeat: no-repeat; background-position: center bottom; pointer-events: none; }
+        .unit { position: absolute; bottom: 40px; width: 80px; height: 80px; z-index: 5; transition: transform 0.1s; background-size: contain; background-repeat: no-repeat; background-position: center bottom; pointer-events: none; }
         .hp-mini { position: absolute; top: -15px; width: 100%; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #fff; }
         .hp-mini-inner { height: 100%; background: #0f0; width: 100%; }
 
-        /* ----- PC版 UI（基本） ----- */
-        .ui-main { display: flex; justify-content: center; gap: 15px; margin-top: auto; margin-bottom: 10px; z-index: 50; }
-        .deck-grid { display: grid; grid-template-columns: repeat(5, 100px); grid-template-rows: repeat(2, 100px); gap: 10px; min-width: 540px; }
-        .slot { position: relative; background: #444; border: 4px solid #777; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: 0.1s; overflow: hidden; padding: 0; width:100px; height:100px; user-select: none; }
+        /* UIメイン: 働きネコ - キャラリスト - にゃんこ砲 の順に横並び */
+        .ui-main { 
+            background: #5D2E0C; 
+            border: 5px solid #000; 
+            width: 990px;
+            margin: 0 auto;
+            display: flex; 
+            flex-direction: row; 
+            padding: 15px; 
+            z-index: 50; 
+            flex-grow: 1; 
+            box-sizing: border-box;
+            gap: 10px;
+            align-items: stretch; /* 子要素の高さを揃える */
+        }
+
+        /* 左右の固定ボタンエリア */
+        .side-control {
+            display: flex;
+            flex-direction: column;
+            width: 140px;
+            flex-shrink: 0;
+            justify-content: center;
+        }
+
+        .deck-scroll-container {
+            flex-grow: 1; 
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            align-items: center;
+        }
+        .deck-scroll-container::-webkit-scrollbar { height: 8px; }
+        .deck-scroll-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .deck-grid { 
+            display: grid; 
+            grid-template-rows: repeat(2, 125px); 
+            grid-auto-flow: column; 
+            grid-auto-columns: 110px; 
+            gap: 12px; 
+            padding: 0 5px;
+            min-width: max-content;
+        }
+        
+        .slot { 
+            position: relative; background: #333; border: 4px solid #777; border-radius: 8px; 
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            color: white; transition: 0.1s; overflow: hidden; padding: 0; 
+            width:110px; height:125px; user-select: none; flex-shrink: 0;
+        }
         .slot:active { transform: scale(0.95); }
-        .slot:disabled { opacity: 0.5; cursor: not-allowed; border-color: #333; }
-        .slot .icon { width: 100%; height: 60px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-top: 5px; pointer-events: none; }
-        .slot .cost { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.6); width: 100%; padding: 4px 0; position: absolute; bottom: 0; pointer-events: none; }
-        .slot .lvl-badge { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.8); color: #f1c40f; padding: 2px 4px; font-size: 12px; border-radius: 3px; font-weight: bold; z-index: 10; pointer-events: none; }
+        .slot:disabled { opacity: 0.5; cursor: not-allowed; border-color: #444; filter: grayscale(1); }
+        .slot .icon { width: 100%; height: 75px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-top: 5px; pointer-events: none; }
+        .slot .cost { font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.8); width: 100%; padding: 4px 0; position: absolute; bottom: 0; pointer-events: none; }
+        .slot .lvl-badge { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,0.8); color: #f1c40f; padding: 2px 4px; font-size: 13px; border-radius: 3px; font-weight: bold; z-index: 10; pointer-events: none; }
         
         .cd-mask { position: absolute; bottom: 0; width: 100%; height: 0%; background: rgba(0,0,0,0.7); pointer-events: none; }
 
-        .worker-btn, .cannon-btn { width: 130px; height: 100px; border-radius: 10px; cursor: pointer; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 4px solid; user-select: none; }
+        /* 両端のボタンの見た目を調整（2段分の高さに合わせる） */
+        .worker-btn, .cannon-btn { 
+            width: 100%; 
+            height: 100%; /* 親要素(ui-main)の高さに追従 */
+            min-height: 262px; /* 125px*2 + 12px(gap) */
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            border: 4px solid; 
+            user-select: none; 
+            font-size: 18px; 
+        }
         .worker-btn { background: #d35400; border-color: #e67e22; }
         .cannon-btn { background: #2980b9; border-color: #3498db; position: relative; overflow: hidden; }
-        .cannon-fill { position: absolute; bottom: 0; width: 100%; background: rgba(255,255,255,0.4); height: 0%; pointer-events: none; }
+        .cannon-fill { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.4); height: 0%; pointer-events: none; }
 
         .damage-pop { position: absolute; color: white; font-weight: bold; text-shadow: 2px 2px #000; animation: floatUp 0.7s forwards; pointer-events: none; z-index: 20; font-size: 20px; }
         @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-60px); opacity: 0; } }
         .shake { animation: shake 0.2s infinite; }
         @keyframes shake { 0%{transform:translate(2px,1px)} 50%{transform:translate(-2px,-1px)} 100%{transform:translate(1px,-1px)} }
-
-        /* =======================================================
-           📱 スマホ専用モード
-           ======================================================= */
-        .mobile-mode #app { display: flex; flex-direction: column; align-items: center; background: #111; }
-        .mobile-mode #top-bar { width: 100vw; box-sizing: border-box; flex-wrap: wrap; gap: 10px; padding: 5px; justify-content: space-around; font-size: 14px; }
-        .mobile-mode .money-text { font-size: 18px; }
-        .mobile-mode .nekokan-text { font-size: 16px; padding: 2px 5px; }
-
-        .mobile-mode .ui-main { display: flex; flex-wrap: wrap; justify-content: space-between; align-content: flex-start; width: 100vw; box-sizing: border-box; padding: 10px; overflow-y: auto; gap: 10px; margin-top: 5px; }
-        .mobile-mode .worker-btn { order: 1; width: calc(50% - 5px); height: 90px; font-size: 20px; }
-        .mobile-mode .cannon-btn { order: 2; width: calc(50% - 5px); height: 90px; font-size: 20px; align-self: flex-start;}
-        .mobile-mode .deck-grid { order: 3; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; min-width: unset; margin-top: 5px; }
-        .mobile-mode .slot { width: 100%; height: 120px; }
-        .mobile-mode .slot .icon { height: 75px; }
-        .mobile-mode .slot .cost { font-size: 20px; padding: 5px 0; }
-        
-        @media (orientation: landscape) and (max-height: 600px) {
-            .mobile-mode #app { position: relative; }
-            .mobile-mode #game-container { margin-top: 0; }
-            .mobile-mode .ui-main {
-                position: absolute; bottom: 0; left: 0; width: 100vw; height: 110px;
-                flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-                background: rgba(0, 0, 0, 0.75); padding: 10px 15px; box-sizing: border-box;
-                align-items: center; gap: 15px; justify-content: flex-start; margin: 0;
-                scrollbar-width: none;
-            }
-            .mobile-mode .ui-main::-webkit-scrollbar { display: none; }
-            .mobile-mode .worker-btn, .mobile-mode .cannon-btn { order: unset; flex: 0 0 110px; height: 90px; }
-            .mobile-mode .deck-grid { order: unset; display: flex; flex-direction: row; gap: 15px; width: auto; margin: 0; }
-            .mobile-mode .slot { flex: 0 0 100px; height: 90px; }
-        }
     </style>
 </head>
 <body>
@@ -109,11 +143,23 @@
     </div>
 
     <div class="ui-main">
-        <div class="worker-btn" onclick="upgradeWorker()">働きネコUP<br><span id="w-cost">¥100</span></div>
-        <div class="deck-grid" id="deck-grid"></div>
-        <div class="cannon-btn" onclick="fireCannon()">
-            <div id="cannon-fill" class="cannon-fill"></div>
-            <div style="position:relative; z-index:2;">にゃんこ砲<br>READY</div>
+        <div class="side-control">
+            <div class="worker-btn" onclick="upgradeWorker()">
+                <span>働きネコUP</span>
+                <span id="w-cost" style="color: #f1c40f;">¥100</span>
+            </div>
+        </div>
+
+        <div class="deck-scroll-container">
+            <div class="deck-grid" id="deck-grid"></div>
+        </div>
+
+        <div class="side-control">
+            <div class="cannon-btn" onclick="fireCannon()">
+                <div id="cannon-fill" class="cannon-fill"></div>
+                <span style="position:relative; z-index:2;">にゃんこ砲</span>
+                <span style="position:relative; z-index:2; font-size: 14px;">発射！</span>
+            </div>
         </div>
     </div>
 </div>
@@ -121,40 +167,9 @@
 <script>
     function resizeApp() {
         const app = document.getElementById('app');
-        const gc = document.getElementById('game-container');
-        const isMobile = window.innerWidth <= 900 || window.innerHeight <= 600;
-
-        if (isMobile) {
-            document.body.classList.add('mobile-mode');
-            app.style.transform = 'none';
-            app.style.width = '100vw';
-            app.style.height = '100vh';
-            
-            const isLandscape = window.innerWidth > window.innerHeight;
-            
-            // 修正：画面からはみ出さないよう、幅と高さの両方から最適なスケールを算出
-            let scaleW = window.innerWidth / 990;
-            // 縦画面なら画面の40%、横画面なら70%程度に収める
-            let heightLimit = isLandscape ? 0.7 : 0.4;
-            let scaleH = (window.innerHeight * heightLimit) / 380;
-            
-            let gcScale = Math.min(scaleW, scaleH);
-            
-            gc.style.transform = `scale(${gcScale})`;
-            gc.style.transformOrigin = 'top center';
-            
-            // 下のUIを引き上げるマージンを計算
-            gc.style.marginBottom = `-${380 * (1 - gcScale)}px`; 
-        } else {
-            document.body.classList.remove('mobile-mode');
-            app.style.width = '1000px';
-            app.style.height = '720px';
-            const scale = Math.min(window.innerWidth / 1000, window.innerHeight / 720, 1);
-            app.style.transform = `scale(${scale})`;
-            app.style.transformOrigin = 'center center';
-            gc.style.transform = 'none';
-            gc.style.marginBottom = '15px';
-        }
+        const scale = Math.min(window.innerWidth / 1000, window.innerHeight / 720, 1);
+        app.style.transform = `scale(${scale})`;
+        app.style.transformOrigin = 'center center';
     }
     window.addEventListener('resize', resizeApp);
     resizeApp();
@@ -209,7 +224,12 @@
             btn.className = 'slot';
             btn.id = `slot-${cat.id}`;
             btn.onclick = () => spawnCat(cat.id);
-            btn.innerHTML = `<div class="lvl-badge">Lv.${level}</div><div class="icon" style="background-image: url('${cat.img}'); transform: scale(${cat.scale})"></div><div class="cost">¥${cat.cost}</div><div class="cd-mask" id="mask-${cat.id}"></div>`;
+            btn.innerHTML = `
+                <div class="lvl-badge">Lv.${level}</div>
+                <div class="icon" style="background-image: url('${cat.img}'); transform: scale(${cat.scale})"></div>
+                <div class="cost">¥${cat.cost}</div>
+                <div class="cd-mask" id="mask-${cat.id}"></div>
+            `;
             grid.appendChild(btn);
             cooldowns[cat.id] = 0;
         });
@@ -227,12 +247,12 @@
         let maxM = 1000 + (workerLv * 1000);
         money = Math.min(maxM, money + (0.2 + workerLv * 0.3));
         document.getElementById('money').innerText = Math.floor(money);
-        document.getElementById('max-m').innerText = maxM;
         document.getElementById('w-lv').innerText = workerLv;
         document.getElementById('w-cost').innerText = workerLv < 8 ? `¥${workerLv * 200}` : "MAX";
 
         Object.keys(ownedCats).forEach(id => {
             const cat = CATS.find(c => c.id === id);
+            if (!cat) return;
             const btn = document.getElementById(`slot-${id}`);
             if (!btn) return;
             const mask = document.getElementById(`mask-${id}`);
@@ -252,7 +272,7 @@
         document.getElementById('p-hp-bar').style.width = (playerHP / 2000 * 100) + "%";
         document.getElementById('e-hp-bar').style.width = (enemyHP / 2000 * 100) + "%";
 
-        if (enemyHP <= 0) endGame("完全勝利！\nネコ缶200個獲得！", 200);
+        if (enemyHP <= 0) endGame("完全勝利！\nネコ缶150個獲得！", 150);
         if (playerHP <= 0) endGame("敗北...", 0);
 
         requestAnimationFrame(updateLoop);
@@ -313,8 +333,8 @@
         const startX = side === 'player' ? 840 : 150;
         const obj = { el, data, side, hp: data.hp, x: startX, kb: 0 };
         el.style.left = startX + 'px';
-        if (data.id === 'bird') el.style.bottom = '145px';
-        if (data.id === 'shirasu') el.style.bottom = '100px';
+        if (data.id === 'bird') el.style.bottom = '155px';
+        if (data.id === 'shirasu') el.style.bottom = '110px';
         document.getElementById('game-container').appendChild(el); (side==='player'?playerUnits:enemyUnits).push(obj);
     }
 
